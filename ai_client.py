@@ -13,10 +13,6 @@ MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
 
 
 async def get_ai_response(history: list[dict]) -> str:
-    """
-    history — список сообщений в формате OpenAI, БЕЗ системного промпта
-    (он добавляется здесь автоматически на каждый вызов).
-    """
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
 
     response = await client.chat.completions.create(
@@ -28,10 +24,6 @@ async def get_ai_response(history: list[dict]) -> str:
 
 
 def build_user_content(text: str, image_urls: list[str]) -> list[dict] | str:
-    """
-    Собирает content сообщения пользователя. Если есть картинки — используем
-    мультимодальный формат (список частей), иначе просто текст.
-    """
     if not image_urls:
         return text or "(no text, see attached image)"
 

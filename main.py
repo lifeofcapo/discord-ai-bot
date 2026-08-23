@@ -9,6 +9,7 @@ from views import MerchantAIView, SupportCenterView, ReserveBeatView, SubmitSale
 from ai_client import get_ai_response, build_user_content
 import state
 
+# --- Настройка ---
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = int(os.getenv("DISCORD_GUILD_ID"))
@@ -16,6 +17,7 @@ GUILD_ID = int(os.getenv("DISCORD_GUILD_ID"))
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("merchant-bot")
 
+# --- Intents: без этого бот не увидит контент сообщений и участников ---
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -26,10 +28,14 @@ tree = app_commands.CommandTree(client)
 
 @client.event
 async def on_ready():
+    # Регистрируем persistent views — без этого кнопки перестанут работать после рестарта бота
     client.add_view(MerchantAIView())
     client.add_view(SupportCenterView())
     client.add_view(ReserveBeatView())
     client.add_view(SubmitSaleView())
+
+    # Синхронизация команд НА КОНКРЕТНЫЙ СЕРВЕР — применяется мгновенно,
+    # в отличие от глобальной синхронизации (та может идти до часа)
     guild = discord.Object(id=GUILD_ID)
     tree.copy_global_to(guild=guild)
     synced = await tree.sync(guild=guild)
@@ -42,8 +48,8 @@ async def on_ready():
 @app_commands.checks.has_permissions(administrator=True)
 async def post_merchant_ai_button(interaction: discord.Interaction):
     await interaction.channel.send(
-        "**Merchant AI**\n\n"
-        "Need help with a deal? Open your private AI Space below.",
+        "**Merchant AI — Your Personal Sales Assistant**\n\n"
+        "Stuck in a conversation with a client? Hit the button below to open your private AI space.",
         view=MerchantAIView(),
     )
     await interaction.response.send_message("Опубликовано ✅", ephemeral=True)
@@ -81,12 +87,13 @@ async def post_submit_sale_button(interaction: discord.Interaction):
 
 @client.event
 async def on_message(message: discord.Message):
+    # Игнорируем сообщения от самого бота — иначе будет бесконечный цикл
     if message.author.bot:
         return
 
     thread_id = message.channel.id
 
-    # answer only in AI placement
+    # Отвечаем только там, где реально запущено AI-пространство
     if not state.is_ai_thread(thread_id):
         return
 
@@ -129,11 +136,45 @@ async def reset(interaction: discord.Interaction):
     )
 
 
+@tree.command(name="list_threads", description="[Admin] Показать активные приватные треды в этом канале")
+@app_commands.checks.has_permissions(administrator=True)
+async def list_threads(interaction: discord.Interaction):
+    threads = [t for t in interaction.channel.threads if t.type == discord.ChannelType.private_thread]
+
+    if not threads:
+        await interaction.response.send_message("Активных тредов здесь нет.", ephemeral=True)
+        return
+
+    lines = [f"`{t.id}` — {t.name}" for t in threads]
+    await interaction.response.send_message(
+        "**Активные треды:**\n" + "\n".join(lines), ephemeral=True
+    )
+
+
+@tree.command(name="close_thread", description="[Admin] Удалить тред по ID (работает, даже если вы не участник)")
+@app_commands.checks.has_permissions(administrator=True)
+@app_commands.describe(thread_id="ID треда — взять из /list_threads")
+async def close_thread(interaction: discord.Interaction, thread_id: str):
+    try:
+        thread = await client.fetch_channel(int(thread_id))
+    except (ValueError, discord.NotFound):
+        await interaction.response.send_message("Тред с таким ID не найден.", ephemeral=True)
+        return
+
+    if not isinstance(thread, discord.Thread):
+        await interaction.response.send_message("Это не тред.", ephemeral=True)
+        return
+
+    name = thread.name
+    await thread.delete()
+    await interaction.response.send_message(f"🗑️ Удалено: {name}", ephemeral=True)
+
+
 @tree.command(name="ping", description="Проверка, что бот жив и отвечает")
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message(
         f"🏓 Pong! Бот на связи, задержка: {round(client.latency * 1000)}мс",
-        ephemeral=True,  
+        ephemeral=True,  # видно только тому, кто вызвал команду
     )
 
 
