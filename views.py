@@ -2,22 +2,25 @@ import discord
 
 from modals import ReservationModal, SaleSubmissionModal
 from threads_utils import create_private_thread
+from state import register_ai_thread
 
 
 class MerchantAIView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)  # persistent - works after bot restart
+        super().__init__(timeout=None)  # persistent — work after bot restart
 
     @discord.ui.button(
-        label="🚀 Launch Merchant AI",
+        label="Launch Merchant AI",
         style=discord.ButtonStyle.primary,
-        custom_id="launch_merchant_ai",  # must have persistent view
+        custom_id="launch_merchant_ai",  # must be for persistent view
     )
     async def launch(self, interaction: discord.Interaction, button: discord.ui.Button):
         thread = await create_private_thread(
             interaction,
             thread_name=f"AI Space — {interaction.user.display_name}",
         )
+
+        register_ai_thread(thread.id)
 
         await thread.send(
             f"Welcome, {interaction.user.mention} 👋\n\n"

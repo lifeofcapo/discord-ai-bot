@@ -18,7 +18,7 @@ async def create_private_thread(
     thread = await channel.create_thread(
         name=thread_name,
         type=discord.ChannelType.private_thread,
-        invitable=False,  # обычные участники не могут сами приглашать друг друга
+        invitable=False, 
     )
 
     await thread.add_user(interaction.user)

@@ -47,9 +47,10 @@ class SaleSubmissionModal(discord.ui.Modal, title="Partner Catalog Sale Submissi
     artist_name = discord.ui.TextInput(label="Artist Name / Handle", required=True)
     artist_email = discord.ui.TextInput(label="Artist Email", required=True)
     sale_amount = discord.ui.TextInput(label="Sale Amount", required=True)
-    payment_method = discord.ui.TextInput(label="Payment Method", required=True)
-    payment_reference = discord.ui.TextInput(
-        label="Payment Reference / Transaction ID", required=True
+    payment_info = discord.ui.TextInput(
+        label="Payment Method & Reference",
+        placeholder="e.g. Stripe — txn_12345",
+        required=True,
     )
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -66,12 +67,7 @@ class SaleSubmissionModal(discord.ui.Modal, title="Partner Catalog Sale Submissi
         embed.add_field(name="Artist Name / Handle", value=self.artist_name.value, inline=False)
         embed.add_field(name="Artist Email", value=self.artist_email.value, inline=False)
         embed.add_field(name="Sale Amount", value=self.sale_amount.value, inline=True)
-        embed.add_field(name="Payment Method", value=self.payment_method.value, inline=True)
-        embed.add_field(
-            name="Payment Reference / Transaction ID",
-            value=self.payment_reference.value,
-            inline=False,
-        )
+        embed.add_field(name="Payment Method & Reference", value=self.payment_info.value, inline=True)
         embed.set_footer(text=f"Submitted by {interaction.user}")
 
         await thread.send(embed=embed)
