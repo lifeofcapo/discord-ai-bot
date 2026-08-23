@@ -5,12 +5,10 @@ from openai import AsyncOpenAI
 
 from system_prompt import SYSTEM_PROMPT
 
-# Загружаем .env прямо здесь, чтобы не зависеть от порядка импортов в main.py
 load_dotenv()
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Можно переопределить через .env, не трогая код
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
 
 
