@@ -1,6 +1,6 @@
 import discord
 
-from threads_utils import create_private_thread
+from ..threads_utils import create_private_thread
 
 
 class ReservationModal(discord.ui.Modal, title="Partner Catalog Reservation Request"):
@@ -13,6 +13,10 @@ class ReservationModal(discord.ui.Modal, title="Partner Catalog Reservation Requ
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        # Откладываем ответ сразу дальше идёт медленная работа (создание треда +
+        # добавление staff), а у Discord всего 3 секунды на первый ответ без defer.
+        await interaction.response.defer(ephemeral=True)
+
         thread = await create_private_thread(
             interaction,
             thread_name=f"Reservation — {self.product_id.value} — {interaction.user.display_name}",
@@ -35,7 +39,7 @@ class ReservationModal(discord.ui.Modal, title="Partner Catalog Reservation Requ
 
         await thread.send(embed=embed)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "Reservation request submitted. The beat is not reserved yet. "
             "Staff will verify current availability and payment before confirming the reservation.",
             ephemeral=True,
@@ -54,6 +58,8 @@ class SaleSubmissionModal(discord.ui.Modal, title="Partner Catalog Sale Submissi
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
         thread = await create_private_thread(
             interaction,
             thread_name=f"Sale — {self.product_id.value} — {interaction.user.display_name}",
@@ -72,7 +78,7 @@ class SaleSubmissionModal(discord.ui.Modal, title="Partner Catalog Sale Submissi
 
         await thread.send(embed=embed)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "Sale submitted successfully. Staff will verify the sale and payment, "
             "then complete the required fulfillment process.",
             ephemeral=True,

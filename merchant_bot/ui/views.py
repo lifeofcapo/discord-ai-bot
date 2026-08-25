@@ -1,8 +1,8 @@
 import discord
 
-from modals import ReservationModal, SaleSubmissionModal
-from threads_utils import create_private_thread
-import state
+from .modals import ReservationModal, SaleSubmissionModal
+from ..threads_utils import create_private_thread
+from .. import state
 
 
 async def _get_existing_thread(interaction: discord.Interaction, thread_id: int) -> discord.Thread | None:
@@ -44,6 +44,8 @@ class MerchantAIView(discord.ui.View):
             else:
                 state.clear_active_thread_id(interaction.user.id, "merchant_ai")
 
+        await interaction.response.defer(ephemeral=True)
+
         thread = await create_private_thread(
             interaction,
             thread_name=f"AI Space — {interaction.user.display_name}",
@@ -58,7 +60,7 @@ class MerchantAIView(discord.ui.View):
             "Paste your conversation or send a screenshot, and I'll help you figure out the next move."
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"Your private AI space is ready: {thread.mention}",
             ephemeral=True,
         )
@@ -92,6 +94,8 @@ class SupportCenterView(discord.ui.View):
             else:
                 state.clear_active_thread_id(interaction.user.id, "support")
 
+        await interaction.response.defer(ephemeral=True)
+
         thread = await create_private_thread(
             interaction,
             thread_name=f"Ticket — {interaction.user.display_name}",
@@ -103,7 +107,7 @@ class SupportCenterView(discord.ui.View):
             f"Hi {interaction.user.mention}, describe your issue here and our team will get back to you shortly."
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"Your private support ticket is ready: {thread.mention}",
             ephemeral=True,
         )

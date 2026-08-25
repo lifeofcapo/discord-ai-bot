@@ -1,15 +1,19 @@
-
-#temporary storage, then need to be replaced with Postgres.
+"""
+ВРЕМЕННОЕ хранилище в оперативной памяти.
+Работает только пока бот запущен — после перезапуска вся история, список
+активных AI-тредов и активные пространства обнуляются. Следующий шаг —
+заменить на PostgreSQL.
+"""
 import time
 
 # thread_id -> список сообщений в формате OpenAI [{"role": ..., "content": ...}, ...]
 ai_thread_history: dict[int, list[dict]] = {}
 
-# (user_id, kind) -> thread_id — to avoid doubles
+# (user_id, kind) -> thread_id — чтобы не плодить дубли для Merchant AI / Support
 # kind: "merchant_ai" | "support"
 active_threads: dict[tuple[int, str], int] = {}
 
-# (user_id, kind) -> defence from double-click
+# (user_id, kind) -> timestamp последнего клика — защита от двойного клика
 _last_click: dict[tuple[int, str], float] = {}
 COOLDOWN_SECONDS = 4
 

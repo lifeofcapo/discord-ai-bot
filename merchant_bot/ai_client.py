@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-from system_prompt import SYSTEM_PROMPT
+from .system_prompt import SYSTEM_PROMPT
 
 load_dotenv()
 

@@ -1,6 +1,6 @@
 import discord
 
-from config import STAFF_ROLE_NAMES
+from .config import STAFF_ROLE_NAMES
 
 
 async def create_private_thread(
@@ -26,7 +26,7 @@ async def create_private_thread(
             try:
                 await thread.add_user(member)
             except discord.HTTPException:
-                pass 
+                pass  
 
     return thread
 
