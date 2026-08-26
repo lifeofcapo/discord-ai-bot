@@ -13,8 +13,6 @@ class ReservationModal(discord.ui.Modal, title="Partner Catalog Reservation Requ
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Откладываем ответ сразу дальше идёт медленная работа (создание треда +
-        # добавление staff), а у Discord всего 3 секунды на первый ответ без defer.
         await interaction.response.defer(ephemeral=True)
 
         thread = await create_private_thread(

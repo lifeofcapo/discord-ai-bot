@@ -13,6 +13,8 @@ COGS = [
     "merchant_bot.cogs.ai_assistant",
     "merchant_bot.cogs.profile",
     "merchant_bot.cogs.misc",
+    "merchant_bot.cogs.knowledge_base_admin",
+    "merchant_bot.cogs.reactions",
 ]
 
 
@@ -21,19 +23,20 @@ class MerchantBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
+        intents.reactions = True
 
-        super().__init__(command_prefix="!", intents=intents) 
+        super().__init__(command_prefix="!", intents=intents)
         self.guild_id = guild_id
 
     async def setup_hook(self):
         for cog in COGS:
             await self.load_extension(cog)
 
+        # Persistent views — переживают рестарт бота, без этого кнопки перестанут работать
         self.add_view(MerchantAIView())
         self.add_view(SupportCenterView())
         self.add_view(ReserveBeatView())
         self.add_view(SubmitSaleView())
-
         guild = discord.Object(id=self.guild_id)
         self.tree.copy_global_to(guild=guild)
         synced = await self.tree.sync(guild=guild)

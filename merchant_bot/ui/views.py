@@ -3,10 +3,10 @@ import discord
 from .modals import ReservationModal, SaleSubmissionModal
 from ..threads_utils import create_private_thread
 from .. import state
+from ..db import repository as db
 
 
 async def _get_existing_thread(interaction: discord.Interaction, thread_id: int) -> discord.Thread | None:
-    """Проверяет, что тред из state реально ещё существует и не архивирован."""
     try:
         thread = await interaction.guild.fetch_channel(thread_id)
         if isinstance(thread, discord.Thread) and not thread.archived:
@@ -32,9 +32,11 @@ class MerchantAIView(discord.ui.View):
             )
             return
 
-        existing_id = state.get_active_thread_id(interaction.user.id, "merchant_ai")
-        if existing_id:
-            existing = await _get_existing_thread(interaction, existing_id)
+        await db.get_or_create_student(interaction.user.id, interaction.user.display_name)
+
+        existing_record = await db.get_active_thread(interaction.user.id, "merchant_ai")
+        if existing_record:
+            existing = await _get_existing_thread(interaction, existing_record.id)
             if existing:
                 await interaction.response.send_message(
                     f"You already have an open AI space: {existing.mention}",
@@ -42,7 +44,7 @@ class MerchantAIView(discord.ui.View):
                 )
                 return
             else:
-                state.clear_active_thread_id(interaction.user.id, "merchant_ai")
+                await db.deactivate_thread(existing_record.id)
 
         await interaction.response.defer(ephemeral=True)
 
@@ -51,8 +53,7 @@ class MerchantAIView(discord.ui.View):
             thread_name=f"AI Space — {interaction.user.display_name}",
         )
 
-        state.register_ai_thread(thread.id)
-        state.set_active_thread_id(interaction.user.id, "merchant_ai", thread.id)
+        await db.create_thread(thread.id, interaction.user.id, "merchant_ai")
 
         await thread.send(
             f"Welcome, {interaction.user.mention} 👋\n\n"
@@ -82,9 +83,11 @@ class SupportCenterView(discord.ui.View):
             )
             return
 
-        existing_id = state.get_active_thread_id(interaction.user.id, "support")
-        if existing_id:
-            existing = await _get_existing_thread(interaction, existing_id)
+        await db.get_or_create_student(interaction.user.id, interaction.user.display_name)
+
+        existing_record = await db.get_active_thread(interaction.user.id, "support")
+        if existing_record:
+            existing = await _get_existing_thread(interaction, existing_record.id)
             if existing:
                 await interaction.response.send_message(
                     f"You already have an open ticket: {existing.mention}",
@@ -92,7 +95,7 @@ class SupportCenterView(discord.ui.View):
                 )
                 return
             else:
-                state.clear_active_thread_id(interaction.user.id, "support")
+                await db.deactivate_thread(existing_record.id)
 
         await interaction.response.defer(ephemeral=True)
 
@@ -101,7 +104,7 @@ class SupportCenterView(discord.ui.View):
             thread_name=f"Ticket — {interaction.user.display_name}",
         )
 
-        state.set_active_thread_id(interaction.user.id, "support", thread.id)
+        await db.create_thread(thread.id, interaction.user.id, "support")
 
         await thread.send(
             f"Hi {interaction.user.mention}, describe your issue here and our team will get back to you shortly."

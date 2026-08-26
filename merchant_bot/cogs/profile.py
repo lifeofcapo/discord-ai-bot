@@ -2,8 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .. import state
 from ..config import PARTNER_CATALOG_LIVE_ROLE, STAFF_ROLE_NAMES
+from ..db import repository as db
 
 # Роли, которые вообще не показываем в профиле (служебные/неинформативные)
 HIDDEN_FROM_PROFILE = {"@everyone", PARTNER_CATALOG_LIVE_ROLE, "Staff Access"}
@@ -19,11 +19,8 @@ class ProfileCog(commands.Cog):
         target = member or interaction.user
         role_names = {r.name for r in target.roles}
 
-        visible_roles = [
-            r.name for r in target.roles
-            if r.name not in HIDDEN_FROM_PROFILE
-        ]
-        visible_roles.sort()  # стабильный порядок вывода
+        visible_roles = [r.name for r in target.roles if r.name not in HIDDEN_FROM_PROFILE]
+        visible_roles.sort()
 
         is_staff = bool(role_names.intersection(STAFF_ROLE_NAMES))
         has_live_catalog = PARTNER_CATALOG_LIVE_ROLE in role_names
@@ -50,18 +47,16 @@ class ProfileCog(commands.Cog):
             inline=True,
         )
 
-        ai_thread_id = state.get_active_thread_id(target.id, "merchant_ai")
-        if ai_thread_id:
-            history_len = len(state.get_history(ai_thread_id))
+        thread_record = await db.get_active_thread(target.id, "merchant_ai")
+        if thread_record:
+            history = await db.get_history(thread_record.id)
             embed.add_field(
                 name="Merchant AI",
-                value=f"Active space — {history_len} messages this session",
+                value=f"Active space — {len(history)} messages on record",
                 inline=False,
             )
         else:
             embed.add_field(name="Merchant AI", value="No active space yet", inline=False)
-
-        embed.set_footer(text="Session data resets when the bot restarts — persistent history coming soon.")
 
         await interaction.response.send_message(embed=embed, ephemeral=(member is None))
 
