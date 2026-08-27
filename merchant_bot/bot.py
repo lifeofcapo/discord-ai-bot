@@ -13,7 +13,7 @@ COGS = [
     "merchant_bot.cogs.ai_assistant",
     "merchant_bot.cogs.profile",
     "merchant_bot.cogs.misc",
-    "merchant_bot.cogs.knowledge_base_admin",
+    "merchant_bot.cogs.knowledge_ingestion",
     "merchant_bot.cogs.reactions",
 ]
 
@@ -32,7 +32,6 @@ class MerchantBot(commands.Bot):
         for cog in COGS:
             await self.load_extension(cog)
 
-        # Persistent views — переживают рестарт бота, без этого кнопки перестанут работать
         self.add_view(MerchantAIView())
         self.add_view(SupportCenterView())
         self.add_view(ReserveBeatView())

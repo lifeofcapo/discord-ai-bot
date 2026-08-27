@@ -22,7 +22,7 @@ async def add_entry(title: str, content: str, added_by: str | None = None) -> Kn
 
 
 async def deactivate_entry(entry_id: int) -> bool:
-    """Не удаляем — помечаем неактивным, история остаётся (версионирование)."""
+    #Не удаляем — помечаем неактивным, версионирование.
     async with async_session() as session:
         entry = await session.get(KnowledgeBaseEntry, entry_id)
         if entry is None:
@@ -33,10 +33,9 @@ async def deactivate_entry(entry_id: int) -> bool:
 
 
 async def search(query: str, top_k: int = 4) -> list[KnowledgeBaseEntry]:
-    """
-    Находит top_k самых релевантных активных записей под запрос —
-    через косинусное расстояние pgvector (оператор `<=>`, чем меньше, тем ближе).
-    """
+    # Находит top_k самых релевантных активных записей под запрос —
+    #через косинусное расстояние pgvector (оператор `<=>`, чем меньше, тем ближе).
+
     query_embedding = await embed_text(query)
 
     async with async_session() as session:

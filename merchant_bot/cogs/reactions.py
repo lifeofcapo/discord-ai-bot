@@ -22,7 +22,7 @@ class ReactionsCog(commands.Cog):
         try:
             await message.remove_reaction(payload.emoji, user)
         except discord.HTTPException:
-            pass  # реакция уже могла быть убрана вручную — не критично
+            pass  # реакция уже могла быть убрана вручную
 
 
 async def setup(bot: commands.Bot):

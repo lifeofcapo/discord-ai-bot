@@ -2,10 +2,10 @@ import os
 import logging
 
 from dotenv import load_dotenv
+load_dotenv()
 
 from merchant_bot.bot import build_bot
 
-load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 
