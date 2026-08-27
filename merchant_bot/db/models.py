@@ -30,6 +30,7 @@ class AIThread(Base):
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
     kind: Mapped[str] = mapped_column(String(20))  # "merchant_ai" | "support"
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    summary: Mapped[str] = mapped_column(Text, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     student: Mapped["Student"] = relationship(back_populates="threads")

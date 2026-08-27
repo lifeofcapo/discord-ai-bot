@@ -1,6 +1,6 @@
 import json
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 
 from .engine import async_session
 from .models import Student, AIThread, AIMessage
@@ -57,7 +57,6 @@ async def append_message(thread_id: int, role: str, content):
 
 
 async def get_history(thread_id: int, limit: int = 40) -> list[dict]:
-#лимит - 40, защита от долгих тредов, экономия
     async with async_session() as session:
         result = await session.execute(
             select(AIMessage)
@@ -69,9 +68,53 @@ async def get_history(thread_id: int, limit: int = 40) -> list[dict]:
         return [{"role": m.role, "content": json.loads(m.content)} for m in messages]
 
 
+async def count_messages(thread_id: int) -> int:
+    async with async_session() as session:
+        result = await session.execute(
+            select(func.count()).select_from(AIMessage).where(AIMessage.thread_id == thread_id)
+        )
+        return result.scalar_one()
+
+
+async def get_thread_summary(thread_id: int) -> str | None:
+    async with async_session() as session:
+        thread = await session.get(AIThread, thread_id)
+        return thread.summary if thread else None
+
+
+async def set_thread_summary(thread_id: int, summary: str):
+    async with async_session() as session:
+        await session.execute(
+            update(AIThread).where(AIThread.id == thread_id).values(summary=summary)
+        )
+        await session.commit()
+
+
+async def get_oldest_messages(thread_id: int, count: int) -> list[AIMessage]:
+    async with async_session() as session:
+        result = await session.execute(
+            select(AIMessage)
+            .where(AIMessage.thread_id == thread_id)
+            .order_by(AIMessage.created_at.asc())
+            .limit(count)
+        )
+        return list(result.scalars().all())
+
+
+async def delete_messages(message_ids: list[int]):
+    async with async_session() as session:
+        result = await session.execute(select(AIMessage).where(AIMessage.id.in_(message_ids)))
+        for msg in result.scalars().all():
+            await session.delete(msg)
+        await session.commit()
+
+
 async def reset_thread_history(thread_id: int):
     async with async_session() as session:
         result = await session.execute(select(AIMessage).where(AIMessage.thread_id == thread_id))
         for msg in result.scalars().all():
             await session.delete(msg)
+        await session.execute(
+            update(AIThread).where(AIThread.id == thread_id).values(summary=None)
+        )
         await session.commit()

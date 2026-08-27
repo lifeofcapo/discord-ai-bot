@@ -8,6 +8,8 @@ from ..ai_client import get_ai_response, build_user_content
 from ..db import repository as db
 from .. import knowledge_base as kb
 from .. import storage
+from .. import rate_limit
+from ..summarizer import maybe_summarize_thread
 
 log = logging.getLogger("merchant-bot")
 
@@ -26,11 +28,19 @@ class AIAssistantCog(commands.Cog):
         if not await db.is_ai_thread(thread_id):
             return
 
+        allowed, retry_after = rate_limit.check_and_record(message.author.id)
+        if not allowed:
+            await message.channel.send(
+                f"⏳ Too much messages in a row "
+                f"{round(retry_after)} sec. and write again.",
+                delete_after=10,
+            )
+            return
+
         image_urls = []
         for att in message.attachments:
             if att.content_type and att.content_type.startswith("image/"):
                 image_urls.append(att.url)
-                # Сохраняем копию в S3 — Discord-ссылка временная и рано или поздно протухнет
                 try:
                     await storage.save_screenshot(message.author.id, att.url, att.content_type)
                 except Exception as e:
@@ -41,11 +51,18 @@ class AIAssistantCog(commands.Cog):
 
         async with message.channel.typing():
             try:
-                # RAG: подтягиваем релевантные куски базы знаний под конкретное сообщение
+                # RAG
                 kb_entries = await kb.search(message.content or "sales conversation analysis")
                 kb_context = kb.format_for_prompt(kb_entries)
 
                 history = await db.get_history(thread_id)
+
+                summary = await db.get_thread_summary(thread_id)
+                if summary:
+                    history = [
+                        {"role": "system", "content": f"CONVERSATION SUMMARY SO FAR:\n{summary}"}
+                    ] + history
+
                 if kb_context:
                     history = [{"role": "system", "content": kb_context}] + history
 
@@ -59,6 +76,11 @@ class AIAssistantCog(commands.Cog):
 
         await db.append_message(thread_id, "assistant", reply)
         await message.channel.send(reply)
+
+        try:
+            await maybe_summarize_thread(thread_id)
+        except Exception:
+            log.exception(f"Summarization step failed for thread {thread_id}")
 
     @app_commands.command(name="reset", description="Сбросить память и историю в этом AI-пространстве")
     async def reset(self, interaction: discord.Interaction):
