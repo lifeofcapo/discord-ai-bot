@@ -10,6 +10,7 @@ from .. import knowledge_base as kb
 from .. import storage
 from .. import rate_limit
 from ..summarizer import maybe_summarize_thread
+from ..response_formatter import format_reply
 
 log = logging.getLogger("merchant-bot")
 
@@ -31,8 +32,8 @@ class AIAssistantCog(commands.Cog):
         allowed, retry_after = rate_limit.check_and_record(message.author.id)
         if not allowed:
             await message.channel.send(
-                f"⏳ Too much messages in a row "
-                f"{round(retry_after)} sec. and write again.",
+                f"⏳ Слишком много сообщений подряд — подожди ещё "
+                f"{round(retry_after)} сек. и напиши снова.",
                 delete_after=10,
             )
             return
@@ -51,7 +52,6 @@ class AIAssistantCog(commands.Cog):
 
         async with message.channel.typing():
             try:
-                # RAG
                 kb_entries = await kb.search(message.content or "sales conversation analysis")
                 kb_context = kb.format_for_prompt(kb_entries)
 
@@ -75,7 +75,7 @@ class AIAssistantCog(commands.Cog):
                 return
 
         await db.append_message(thread_id, "assistant", reply)
-        await message.channel.send(reply)
+        await message.channel.send(format_reply(reply))
 
         try:
             await maybe_summarize_thread(thread_id)

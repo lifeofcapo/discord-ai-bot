@@ -3,6 +3,7 @@ import logging
 import discord
 from discord import app_commands
 from discord.ext import commands
+from . import storage
 
 from .ui.views import MerchantAIView, SupportCenterView, ReserveBeatView, SubmitSaleView
 
@@ -29,6 +30,10 @@ class MerchantBot(commands.Bot):
         self.guild_id = guild_id
 
     async def setup_hook(self):
+        try:
+            storage.ensure_bucket_exists()
+        except Exception:
+            log.exception("Не удалось проверить/создать S3 bucket при старте")
         for cog in COGS:
             await self.load_extension(cog)
 
