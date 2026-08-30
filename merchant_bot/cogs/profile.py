@@ -5,7 +5,6 @@ from discord.ext import commands
 from ..config import PARTNER_CATALOG_LIVE_ROLE, STAFF_ROLE_NAMES
 from ..db import repository as db
 
-# Роли, которые вообще не показываем в профиле (служебные/неинформативные)
 HIDDEN_FROM_PROFILE = {"@everyone", PARTNER_CATALOG_LIVE_ROLE, "Staff Access"}
 
 

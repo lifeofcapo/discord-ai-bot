@@ -9,7 +9,7 @@ from ..db import repository as db
 from .. import knowledge_base as kb
 from .. import storage
 from .. import rate_limit
-from ..summarizer import maybe_summarize_thread
+from ..summarizer import maybe_summarize_thread, close_thread_with_summary
 from ..response_formatter import format_reply
 
 log = logging.getLogger("merchant-bot")
@@ -32,8 +32,8 @@ class AIAssistantCog(commands.Cog):
         allowed, retry_after = rate_limit.check_and_record(message.author.id)
         if not allowed:
             await message.channel.send(
-                f"⏳ Слишком много сообщений подряд — подожди ещё "
-                f"{round(retry_after)} сек. и напиши снова.",
+                f"⏳ Too many messages in a row - please wait some more "
+                f"{round(retry_after)} sec. then try again.",
                 delete_after=10,
             )
             return
@@ -52,6 +52,7 @@ class AIAssistantCog(commands.Cog):
 
         async with message.channel.typing():
             try:
+                # RAG: подтягиваем релевантные куски базы знаний под конкретное сообщение
                 kb_entries = await kb.search(message.content or "sales conversation analysis")
                 kb_context = kb.format_for_prompt(kb_entries)
 
@@ -82,19 +83,48 @@ class AIAssistantCog(commands.Cog):
         except Exception:
             log.exception(f"Summarization step failed for thread {thread_id}")
 
-    @app_commands.command(name="reset", description="Сбросить память и историю в этом AI-пространстве")
+    @app_commands.command(name="reset", description="Reset your memory and history in this AI space")
     async def reset(self, interaction: discord.Interaction):
         thread_id = interaction.channel.id
 
         if not await db.is_ai_thread(thread_id):
             await interaction.response.send_message(
-                "Эта команда работает только внутри приватного AI-пространства.",
+                "This command only works within a private AI space.",
                 ephemeral=True,
             )
             return
 
         await db.reset_thread_history(thread_id)
-        await interaction.response.send_message("🔄 Память сброшена. Можно начинать с чистого листа.")
+        await interaction.response.send_message("🔄 Memory reset. You can start from scratch.")
+
+    @app_commands.command(name="close", description="Close this chat 🔒")
+    async def close(self, interaction: discord.Interaction):
+        thread_id = interaction.channel.id
+        thread_record = await db.get_thread(thread_id)
+
+        if thread_record is None or thread_record.kind != "merchant_ai" or not thread_record.active:
+            await interaction.response.send_message(
+                "This command only works within an open AI chat.",
+                ephemeral=True,
+            )
+            return
+
+        if interaction.user.id != thread_record.student_id:
+            await interaction.response.send_message(
+                "Only the person who opened the chat can close it.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer()
+        await close_thread_with_summary(thread_id, thread_record.student_id)
+        await interaction.followup.send(
+            "🔒 Chat is closed. Thank you for using Merchant AI - you can open a new one at any time."
+        )
+
+        try:
+            await interaction.channel.edit(archived=True, locked=True)
+        except discord.HTTPException:
+            pass
 
 
 async def setup(bot: commands.Bot):

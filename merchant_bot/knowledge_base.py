@@ -33,9 +33,6 @@ async def deactivate_entry(entry_id: int) -> bool:
 
 
 async def search(query: str, top_k: int = 4) -> list[KnowledgeBaseEntry]:
-    # Находит top_k самых релевантных активных записей под запрос —
-    #через косинусное расстояние pgvector (оператор `<=>`, чем меньше, тем ближе).
-
     query_embedding = await embed_text(query)
 
     async with async_session() as session:

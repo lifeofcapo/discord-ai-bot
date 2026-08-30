@@ -21,6 +21,33 @@ class Student(Base):
 
     threads: Mapped[list["AIThread"]] = relationship(back_populates="student")
     screenshots: Mapped[list["Screenshot"]] = relationship(back_populates="student")
+    referral_code: Mapped["ReferralCode"] = relationship(back_populates="owner", uselist=False)
+
+
+class ReferralCode(Base):
+    __tablename__ = "referral_codes"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("students.id"), unique=True)
+    balance_cents: Mapped[int] = mapped_column(BigInteger, default=0)  # виртуальный баланс, в центах
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    owner: Mapped["Student"] = relationship(back_populates="referral_code")
+    conversions: Mapped[list["ReferralConversion"]] = relationship(back_populates="referral_code")
+
+
+class ReferralConversion(Base):
+    __tablename__ = "referral_conversions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    referral_code_id: Mapped[int] = mapped_column(ForeignKey("referral_codes.id"))
+    stripe_payment_id: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    payer_email: Mapped[str] = mapped_column(String(255))
+    amount_cents: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    referral_code: Mapped["ReferralCode"] = relationship(back_populates="conversions")
 
 
 class AIThread(Base):
@@ -59,6 +86,18 @@ class KnowledgeBaseEntry(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     added_by: Mapped[str] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ClosedThreadSummary(Base):
+    __tablename__ = "closed_thread_summaries"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    thread_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
+    summary: Mapped[str] = mapped_column(Text)
+    message_count: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    closed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Screenshot(Base):

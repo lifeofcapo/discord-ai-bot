@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 from . import storage
 
-from .ui.views import MerchantAIView, SupportCenterView, ReserveBeatView, SubmitSaleView
+from .ui.views import MerchantAIView, SupportCenterView, ReserveBeatView, SubmitSaleView, CloseThreadView
 
 log = logging.getLogger("merchant-bot")
 
@@ -38,6 +38,7 @@ class MerchantBot(commands.Bot):
             await self.load_extension(cog)
 
         self.add_view(MerchantAIView())
+        self.add_view(CloseThreadView())
         self.add_view(SupportCenterView())
         self.add_view(ReserveBeatView())
         self.add_view(SubmitSaleView())

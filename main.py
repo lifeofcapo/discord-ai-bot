@@ -15,10 +15,10 @@ logging.basicConfig(level=logging.INFO)
 def main():
     if not TOKEN:
         raise RuntimeError(
-            "DISCORD_BOT_TOKEN не найден. Скопируйте .env.example в .env и вставьте токен."
+            "DISCORD_BOT_TOKEN haven't found"
         )
     if not GUILD_ID:
-        raise RuntimeError("DISCORD_GUILD_ID не найден в .env.")
+        raise RuntimeError("DISCORD_GUILD_ID haven't found .env.")
 
     bot = build_bot(guild_id=int(GUILD_ID))
     bot.run(TOKEN)

@@ -3,7 +3,7 @@ import json
 from sqlalchemy import select, update, func
 
 from .engine import async_session
-from .models import Student, AIThread, AIMessage
+from .models import Student, AIThread, AIMessage, ClosedThreadSummary
 
 
 async def get_or_create_student(user_id: int, display_name: str) -> Student:
@@ -16,7 +16,7 @@ async def get_or_create_student(user_id: int, display_name: str) -> Student:
         return student
 
 
-async def get_active_thread(student_id: int, kind: str) -> AIThread | None:
+async def get_active_threads(student_id: int, kind: str) -> list[AIThread]:
     async with async_session() as session:
         result = await session.execute(
             select(AIThread).where(
@@ -25,7 +25,19 @@ async def get_active_thread(student_id: int, kind: str) -> AIThread | None:
                 AIThread.active == True,  # noqa: E712
             )
         )
-        return result.scalar_one_or_none()
+        return list(result.scalars().all())
+
+
+async def count_active_threads(student_id: int, kind: str) -> int:
+    async with async_session() as session:
+        result = await session.execute(
+            select(func.count()).select_from(AIThread).where(
+                AIThread.student_id == student_id,
+                AIThread.kind == kind,
+                AIThread.active == True,  # noqa: E712
+            )
+        )
+        return result.scalar_one()
 
 
 async def create_thread(thread_id: int, student_id: int, kind: str) -> AIThread:
@@ -50,6 +62,11 @@ async def is_ai_thread(thread_id: int) -> bool:
         return thread is not None and thread.kind == "merchant_ai" and thread.active
 
 
+async def get_thread(thread_id: int) -> AIThread | None:
+    async with async_session() as session:
+        return await session.get(AIThread, thread_id)
+
+
 async def append_message(thread_id: int, role: str, content):
     async with async_session() as session:
         session.add(AIMessage(thread_id=thread_id, role=role, content=json.dumps(content)))
@@ -57,6 +74,7 @@ async def append_message(thread_id: int, role: str, content):
 
 
 async def get_history(thread_id: int, limit: int = 40) -> list[dict]:
+    # лимит - 40, страховка на случай, если суммаризация почему-то отстала
     async with async_session() as session:
         result = await session.execute(
             select(AIMessage)
@@ -90,6 +108,14 @@ async def set_thread_summary(thread_id: int, summary: str):
         await session.commit()
 
 
+async def get_all_messages(thread_id: int) -> list[AIMessage]:
+    async with async_session() as session:
+        result = await session.execute(
+            select(AIMessage).where(AIMessage.thread_id == thread_id).order_by(AIMessage.created_at.asc())
+        )
+        return list(result.scalars().all())
+
+
 async def get_oldest_messages(thread_id: int, count: int) -> list[AIMessage]:
     async with async_session() as session:
         result = await session.execute(
@@ -106,6 +132,27 @@ async def delete_messages(message_ids: list[int]):
         result = await session.execute(select(AIMessage).where(AIMessage.id.in_(message_ids)))
         for msg in result.scalars().all():
             await session.delete(msg)
+        await session.commit()
+
+
+async def delete_all_messages(thread_id: int):
+    async with async_session() as session:
+        result = await session.execute(select(AIMessage).where(AIMessage.thread_id == thread_id))
+        for msg in result.scalars().all():
+            await session.delete(msg)
+        await session.commit()
+
+
+async def save_closed_thread_summary(thread_id: int, student_id: int, summary: str, message_count: int):
+    async with async_session() as session:
+        session.add(
+            ClosedThreadSummary(
+                thread_id=thread_id,
+                student_id=student_id,
+                summary=summary,
+                message_count=message_count,
+            )
+        )
         await session.commit()
 
 
