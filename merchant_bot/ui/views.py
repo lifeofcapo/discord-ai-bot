@@ -5,6 +5,7 @@ from ..threads_utils import create_private_thread
 from .. import state
 from ..db import repository as db
 from ..summarizer import close_thread_with_summary
+from ..permissions import has_admin_role
 
 MAX_ACTIVE_MERCHANT_AI_THREADS = 3
 
@@ -38,25 +39,29 @@ class CloseThreadView(discord.ui.View):
             )
             return
 
-        if interaction.user.id != thread_record.student_id:
+        role_names = {r.name for r in interaction.user.roles}
+        is_owner = interaction.user.id == thread_record.student_id
+        is_staff = has_admin_role(role_names)
+
+        if not is_owner and not is_staff:
             await interaction.response.send_message(
-                "Only the person who opened this chat can close it.", ephemeral=True
+                "Only the person who opened this chat, or staff, can close it.", ephemeral=True
             )
             return
 
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         await close_thread_with_summary(thread_id, thread_record.student_id)
 
+
         await interaction.followup.send(
-            "🔒 This chat is now closed. Thanks for using Merchant AI — "
-            "you can open a new one anytime from the referral/launch channel."
+            "🔒 Chat closed and removed. You can open a new one anytime.", ephemeral=True
         )
 
         try:
-            await interaction.channel.edit(archived=True, locked=True)
+            await interaction.channel.delete()
         except discord.HTTPException:
-            pass  # тред всё равно деактивирован в БД — не критично, если архивация в Discord не удалась
+            pass  # тред всё равно деактивирован в БД — не критично, если удаление в Discord не удалось
 
 
 class MerchantAIView(discord.ui.View):
