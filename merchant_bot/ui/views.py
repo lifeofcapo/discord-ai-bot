@@ -69,7 +69,7 @@ class MerchantAIView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="🚀 Launch Merchant AI",
+        label="Launch Merchant AI",
         style=discord.ButtonStyle.primary,
         custom_id="launch_merchant_ai",
     )

@@ -17,8 +17,8 @@ class AdminCog(commands.Cog):
     @is_authorized_admin()
     async def post_merchant_ai_button(self, interaction: discord.Interaction):
         await interaction.channel.send(
-            "**Merchant AI — Your Personal Sales Assistant**\n\n"
-            "Stuck in a conversation with a client? Hit the button below to open your private AI space.",
+            "**Merchant AI**\n\n"
+            "Open your private AI Space below.",
             view=MerchantAIView(),
         )
         await interaction.response.send_message("Опубликовано ✅", ephemeral=True)

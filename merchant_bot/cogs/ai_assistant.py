@@ -15,6 +15,10 @@ from ..permissions import has_admin_role
 
 log = logging.getLogger("merchant-bot")
 
+MAX_SCREENSHOTS_PER_MESSAGE = 2
+MAX_MESSAGES_PER_HOUR = 60
+MAX_MESSAGES_PER_MINUTE = 3
+
 
 class AIAssistantCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -93,7 +97,6 @@ class AIAssistantCog(commands.Cog):
         await db.append_message(thread_id, "assistant", reply)
 
         await message.channel.send(format_reply(reply))
-
         try:
             await maybe_summarize_thread(thread_id)
         except Exception:
