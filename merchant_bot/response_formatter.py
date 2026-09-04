@@ -1,91 +1,80 @@
 import re
 
-CORE_SECTIONS = ["SITUATION", "STRATEGY", "REPLY", "OPTIONAL"]
-
-SECTION_ORDER = CORE_SECTIONS
+SECTION_ORDER = ["SITUATION", "STRATEGY", "REPLY", "OPTIONAL"]
 
 COPYABLE_SECTIONS = {"REPLY", "OPTIONAL"}
 
-def _title_or_upper(word: str) -> str:
-    return f"{word[0]}(?:{word[1:]}|{word[1:].lower()})"
-
-
-SECTION_PATTERN = "|".join(_title_or_upper(w) for w in SECTION_ORDER)
-_SECTION_HEADER_RE = re.compile(
-    r"(?:^|(?<=[\.\!\?\s]))(?P<name>" + SECTION_PATTERN + r")\s*(?:[—\-:]\s*)?",
-    re.MULTILINE,
+_INLINE_HEADER_RE = re.compile(
+    r"^(?P<header>[A-ZА-Яa-zа-я][A-ZА-Яa-zа-я /]{1,40}?):\s*(?P<rest>.*)$"
 )
+
+
+def _strip_markdown(text: str) -> str:
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    text = re.sub(r"(?<!\*)\*([^*\n]+?)\*(?!\*)", r"\1", text)
+    text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    return text
+
+
+def _header_candidate(line: str) -> tuple[str, str] | None:
+    stripped = _strip_markdown(line).strip(" *_>#-\t")
+    match = _INLINE_HEADER_RE.match(stripped)
+    if not match:
+        return None
+    header = match.group("header").strip()
+    rest = match.group("rest").strip()
+    words = header.split()
+    if not words:
+        return None
+    if any(ch in header for ch in ",.!?"):
+        return None
+    if not all(w[0].isupper() for w in words):
+        return None
+    return header.upper(), rest
 
 
 def _split_sections(text: str) -> list[tuple[str, str]]:
     """Возвращает список (SECTION_NAME, content) в порядке появления в тексте."""
-    matches = list(_SECTION_HEADER_RE.finditer(text))
-    if not matches:
-        return []
+    sections: list[tuple[str, list[str]]] = []
 
-    sections = []
-    for i, match in enumerate(matches):
-        name = match.group("name").upper()
-        start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        content = text[start:end].strip()
-        sections.append((name, content))
-    return sections
+    for line in text.splitlines():
+        candidate = _header_candidate(line)
+        if candidate:
+            name, rest = candidate
+            sections.append((name, [rest] if rest else []))
+        elif sections:
+            sections[-1][1].append(line)
 
-
-def _strip_existing_code_fence(text: str) -> str:
-    return re.sub(r"```[a-zA-Z]*\n?|```", "", text).strip()
+    return [(name, "\n".join(content).strip()) for name, content in sections]
 
 
-def _split_copyable_and_trailing(content: str) -> tuple[str, str]:
+def _primary_and_trailing(content: str) -> tuple[str, str]:
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", content) if p.strip()]
     if not paragraphs:
-        return content, ""
-
-    def looks_like_reply(paragraph: str) -> bool:
-        if len(paragraph) > 240:
-            return False
-        lowered = paragraph.lower()
-        developer_markers = (
-            "if you want", "i can also", "i can draft", "let me know if",
-            "depending on", "would you like",
-        )
-        return not any(marker in lowered for marker in developer_markers)
-
-    copyable_paragraphs = []
-    trailing_paragraphs = []
-    hit_trailing = False
-
-    for paragraph in paragraphs:
-        if not hit_trailing and looks_like_reply(paragraph):
-            copyable_paragraphs.append(paragraph)
-        else:
-            hit_trailing = True
-            trailing_paragraphs.append(paragraph)
-
-    if not copyable_paragraphs:
-        copyable_paragraphs = [paragraphs[0]]
-        trailing_paragraphs = paragraphs[1:]
-
-    return "\n\n".join(copyable_paragraphs), "\n\n".join(trailing_paragraphs)
+        return "", ""
+    return paragraphs[0], "\n\n".join(paragraphs[1:])
 
 
 def format_reply(raw_text: str) -> str:
     sections = _split_sections(raw_text)
     if not sections:
-        return raw_text
+        return _strip_markdown(raw_text).strip()
 
     parts = []
     for name, content in sections:
         if not content:
             continue
+
         if name in COPYABLE_SECTIONS:
-            content = _strip_existing_code_fence(content)
-            copyable, trailing = _split_copyable_and_trailing(content)
-            parts.append(f"**{name.title()}**\n```\n{copyable}\n```")
+            primary, trailing = _primary_and_trailing(content)
+            primary = _strip_markdown(primary).strip()
+            if primary:
+                parts.append(f"**{name.title()}**\n```\n{primary}\n```")
             if trailing:
-                parts.append(trailing)
+                parts.append(_strip_markdown(trailing).strip())
         else:
-            parts.append(f"**{name.title()}** — {content}")
+            clean = _strip_markdown(content).strip()
+            parts.append(f"**{name.title()}** — {clean}")
 
     return "\n\n".join(parts)
