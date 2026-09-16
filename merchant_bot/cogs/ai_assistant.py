@@ -1,3 +1,4 @@
+import base64
 import logging
 
 import discord
@@ -16,8 +17,6 @@ from ..permissions import has_admin_role
 log = logging.getLogger("merchant-bot")
 
 MAX_SCREENSHOTS_PER_MESSAGE = 2
-MAX_MESSAGES_PER_HOUR = 60
-MAX_MESSAGES_PER_MINUTE = 3
 
 
 class AIAssistantCog(commands.Cog):
@@ -47,24 +46,58 @@ class AIAssistantCog(commands.Cog):
         if not await db.is_ai_thread(thread_id):
             return
 
-        allowed, retry_after = rate_limit.check_and_record(message.author.id)
+        allowed, retry_after, limit_kind = rate_limit.check_and_record(message.author.id)
         if not allowed:
+            if limit_kind == "hour":
+                wait_text = f"{max(round(retry_after / 60), 1)} мин."
+                limit_text = f"не более {rate_limit.MAX_MESSAGES_PER_HOUR} сообщений в час"
+            else:
+                wait_text = f"{round(retry_after)} сек."
+                limit_text = f"не более {rate_limit.MAX_MESSAGES_PER_MINUTE} сообщений в минуту"
+
             await message.channel.send(
-                f"⏳ Слишком много сообщений подряд — подожди ещё "
-                f"{round(retry_after)} сек. и напиши снова.",
+                f"⏳ Слишком много сообщений подряд ({limit_text}) — "
+                f"подожди ещё {wait_text} и напиши снова.",
                 delete_after=10,
             )
             return
 
+        image_attachments = [
+            att for att in message.attachments
+            if att.content_type and att.content_type.startswith("image/")
+        ]
+
+        if len(image_attachments) > MAX_SCREENSHOTS_PER_MESSAGE:
+            skipped = len(image_attachments) - MAX_SCREENSHOTS_PER_MESSAGE
+            await message.channel.send(
+                f"📎 Обрабатываю только первые {MAX_SCREENSHOTS_PER_MESSAGE} скриншота из "
+                f"этого сообщения, остальные {skipped} — пропускаю.",
+                delete_after=10,
+            )
+            image_attachments = image_attachments[:MAX_SCREENSHOTS_PER_MESSAGE]
+
         image_urls = []
-        for att in message.attachments:
-            if att.content_type and att.content_type.startswith("image/"):
-                image_urls.append(att.url)
-                # Сохраняем копию в S3 — Discord-ссылка временная и рано или поздно протухнет
-                try:
-                    await storage.save_screenshot(message.author.id, att.url, att.content_type)
-                except Exception as e:
-                    log.error(f"Screenshot upload failed: {e}")
+        for att in image_attachments:
+            # Модели отдаём картинку как data:-URL (base64), а не ссылку.
+            # Discord сам скачивает байты боту напрямую (см. httpx GET выше),
+            # а вот доступность presigned-ссылки S3/MinIO для серверов OpenAI
+            # не гарантирована (особенно если MinIO поднят на localhost) —
+            # data:-URL от этой проблемы не зависит и никогда не протухает.
+            try:
+                image_bytes = await att.read()
+            except discord.HTTPException as e:
+                log.error(f"Не удалось скачать вложение из Discord: {e}")
+                continue
+
+            b64 = base64.b64encode(image_bytes).decode("ascii")
+            image_urls.append(f"data:{att.content_type};base64,{b64}")
+
+            # Отдельно сохраняем оригинал в S3 — только для архива/истории,
+            # на отправку модели это уже не влияет, поэтому ошибка тут не критична.
+            try:
+                await storage.save_screenshot(message.author.id, att.url, att.content_type)
+            except Exception as e:
+                log.error(f"Screenshot archival upload failed (не блокирует ответ): {e}")
 
         user_content = build_user_content(message.content, image_urls)
         await db.append_message(thread_id, "user", user_content)
