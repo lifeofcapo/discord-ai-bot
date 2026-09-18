@@ -17,6 +17,7 @@ COGS = [
     "merchant_bot.cogs.knowledge_ingestion",
     "merchant_bot.cogs.reactions",
     "merchant_bot.cogs.server_stats",
+    "merchant_bot.cogs.dm_autoreply",
 ]
 
 
